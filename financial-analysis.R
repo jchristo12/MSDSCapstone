@@ -36,7 +36,7 @@ setwd("C:/Users/Joe/OneDrive - Northwestern University - Student Advantage/498 -
 #set the strings that will be read as 'NA'
 nas = c("", '#NA', "NA", "N.A.", "#N/A")
 #path for the data
-data_path <- 'C:/Users/Joe/OneDrive - Northwestern University - Student Advantage/498 - Capstone Project/financial-analysis-modeling/'
+data_path <- 'C:/Users/Joe/OneDrive - Northwestern University - Student Advantage/498 - Capstone Project/financial-analysis-model/'
 github <- 'https://raw.githubusercontent.com/jchristo12/MSDSCapstone/master/'
 #read in the data
 df <- read.csv(paste0(github, 'financial-analysis-data.csv'), na.strings=nas)
