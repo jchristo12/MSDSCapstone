@@ -290,7 +290,7 @@ rf_cv_pred <- rf_cv$finalModel$predicted
 
 rf <- randomForest(imp_team.revenue~., data=subset3, ntree=2000, mtry=6, importance=TRUE)
 varImp(rf_cv)
-varImpPlot(rf)
+varImpPlot(rf, main="Variable Importance Plot")
 
 #OOS (rf) error estimation
 rf.pred <- predict(rf, newdata=df.test.imp)
@@ -299,6 +299,10 @@ RMSE(df.test.imp$imp_team.revenue, rf.pred)
 
 #OOS (rf_cv) error estimation
 #rf_cv_pred <- predict(rf_cv$finalModel, newdata=df.test.imp)
+
+
+#XGBoost
+
 
 
 
