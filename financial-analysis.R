@@ -326,7 +326,7 @@ names(df.nn)
 
 #impute missing values
 df.nn.imp <- impute_trees(df.nn[,-1], names(df.nn)[-1])
-df.nn.imp <- cbind('team.year'=df.nn[,1], df.nn.imp[,19:36], 'team.total.gms'=df[,15]) %>% data.frame()
+df.nn.imp <- cbind('team.year'=df.nn[,1], df.nn.imp[,20:38], 'team.total.gms'=df[,15]) %>% data.frame()
 
 #create derived features
 df.nn.imp$city.unemploy.rate <- df.nn.imp$imp_city.unemployed / df.nn.imp$imp_city.work.force
@@ -353,7 +353,7 @@ df.nn.y <- subset(df.nn.imp, select=c(team.year, imp_team.revenue, imp_team.valu
 #add Seattle info to the df.nn.x dataframe
 arena_cap <- 18600
 attend_discount <- .98
-sea_values <- c(NA, 608660, NA, 5, 41*arena_cap*attend_discount, NA, NA, NA, NA, NA, NA, NA, NA, 0, NA, NA, 41, 0.03, arena_cap*attend_discount, 1, 0)
+sea_values <- c(NA, 608660, NA, 5, 41*arena_cap*attend_discount, NA, NA, NA, NA, NA, NA, NA, NA, 0, NA, NA, 0, 41, 0.03, arena_cap*attend_discount, 1, 0)
 #df.nn.x <- rbind(df.nn.x, sea_values) %>% data.frame()
 
 #scale the data
@@ -365,9 +365,11 @@ nn_output <- knn.index(df.nn.x.scaled, k=1, algorithm='kd_tree')
 #find team most similar their corresponding valuation revenue multiple
 comp_team <- function(index){
   comp_team_index <- nn_output[index]
-  rev.multiple <- df.nn.y[comp_team_index,c(1,4)]
+  rev.multiple <- df.nn.y[c(index, comp_team_index),c(1,4)]
   return(rev.multiple)
 }
-#comp_team(420)
+comp_team(66)
 
-
+team1 <- df.nn.y[seq(1,419),1] %>% data.frame()
+team2 <- df.nn.y[nn_output[seq(1,419)],1] %>% data.frame()
+nn.result <- cbind('team1'=team1, 'team2'=team2)
