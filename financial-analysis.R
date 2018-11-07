@@ -79,7 +79,6 @@ player_agg <- player %>%
 
 df <- left_join(df, player_agg, by='team.year')
 df$team.superstar <- ifelse(is.na(df$team.superstar), 0, df$team.superstar)
-df$team.superstar.cat <- as.factor(df$team.superstar)
 
 
 #read in team stats data
@@ -119,9 +118,6 @@ ggplot(df.train) +
 ggplot(df.train) +
   geom_point(aes(x=team.fci, y=team.revenue, color=team.champs.5yr))
 
-ggplot(df.train) +
-  geom_boxplot(aes(x=team.superstar.cat, y=team.value))
-
 
 #team value
 ggplot(df.train) +
@@ -136,31 +132,37 @@ ggplot(df.train) +
 #impute variables using decision trees
 df.train.impute <- df.train %>%
   select(-c(1:3,5:7))
-df.train.imp <- impute_trees(df.train.impute, c('team.value', 'city.pop', 'city.work.force', 'city.employed', 'city.unemployed', 'city.returns',
-                                                'city.exempt', 'city.agi', 'city.salary', 'team.revenue', 'team.ticket', 'team.fci'))
+impute_vars <- names(df.train.impute)[-c(1, 9)]
+df.train.imp <- impute_trees(df.train.impute, impute_vars)
 #store the training fits to use on the test data
-impute.fits <- store_impute_fit(df.train.impute, c('team.value', 'city.pop', 'city.work.force', 'city.employed', 'city.unemployed', 'city.returns',
-                                                   'city.exempt', 'city.agi', 'city.salary', 'team.revenue', 'team.ticket', 'team.fci'))
-rm(df.train.impute)
+impute.fits <- store_impute_fit(df.train.impute, impute_vars)
+#rm(df.train.impute)
 #combine the imputed variables to the main training dataframe
-df.train.imp <- cbind(df.train, df.train.imp[,c(25:36)]) %>% data.frame()
+df.train.imp <- cbind(df.train[,c(1:3,5:7)], df.train.imp) %>% data.frame()
 
 missing_values(df.train.imp)
 
 
 #create derived features
 df.train.imp$city.unemploy.rate <- df.train.imp$imp_city.unemployed / df.train.imp$imp_city.work.force
-df.train.imp$team.avg.attend <- df.train.imp$team.total.attend / df.train.imp$team.total.gms
-df.train.imp$team.salary.per.win <- df.train.imp$team.salary / df.train.imp$team.wins
-df.train.imp$team.revenue.multiple <- df.train.imp$team.value / df.train.imp$imp_team.revenue
-df.train.imp$team.salary.per.attend <- df.train.imp$team.salary / df.train.imp$team.total.attend
-df.train.imp$team.attend.revenue <- df.train.imp$team.total.attend * df.train.imp$imp_team.ticket
+df.train.imp$team.avg.attend <- df.train.imp$imp_team.total.attend / df.train.imp$team.total.gms
+df.train.imp$team.salary.per.win <- df.train.imp$imp_team.salary / df.train.imp$imp_team.wins
+df.train.imp$team.revenue.multiple <- df.train.imp$imp_team.value / df.train.imp$imp_team.revenue
+df.train.imp$team.salary.per.attend <- df.train.imp$imp_team.salary / df.train.imp$imp_team.total.attend
+df.train.imp$team.attend.revenue <- df.train.imp$imp_team.total.attend * df.train.imp$imp_team.ticket
 #df.train.imp$city.salary.per.capita <- df.train.imp$imp_city.salary / df.train.imp$imp_city.returns
 
 #transform variables
-df.train.imp$trans_team.champs.5yr <- ifelse(df.train.imp$team.champs.5yr != '0',  'Y', 'N') %>% factor()
-df.train.imp$trans_city.returns <- log(df.train.imp$imp_city.returns)
-df.train.imp$trans_city.exempt <- log(df.train.imp$imp_city.exempt)
+df.train.imp$trans_team.champs.5yr <- ifelse(df.train.imp$imp_team.champs.5yr != '0',  'Y', 'N') %>% factor()
+#df.train.imp$trans_city.returns <- log(df.train.imp$imp_city.returns)
+#df.train.imp$trans_city.exempt <- log(df.train.imp$imp_city.exempt)
+df.train.imp$team.superstar.cat <- as.factor(df.train.imp$imp_team.superstar)
+
+
+#analyze the categorical superstar on team value or revenue
+ggplot(df.train.imp) +
+  geom_boxplot(aes(x=team.superstar.cat, y=team.value))
+
 
 
 #grahpical exploration of derived and transformed features
@@ -173,21 +175,33 @@ p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
 #create a correlation headmap
 df.train.imp %>%
   select_if(is.numeric) %>%
-  select(-c(year, team.total.gms, team.revenue, city.pop, city.work.force, city.employed, city.unemployed, city.returns,
-            city.exempt, city.agi, city.salary, team.value, team.ticket, team.fci)) %>%
+  select(-c(impute_vars, year, team.total.gms)) %>%
   cor_heatmap()
 
 #====== Process the Test Data ======
+#impute test data with training fit function
+impute_test_local <- function(obj.list, test.df, cols){
+  for(i in cols){
+    n <- which(cols == i)
+    if(is.factor(test.df[[i]])){
+      imp <- factor(ifelse(is.na(test.df[[i]]), predict(obj.list[[n]], test.df, type="class"), test.df[[i]]))
+    } else{
+      imp <- ifelse(is.na(test.df[[i]]), predict(obj.list[[n]], test.df), test.df[[i]])
+    }
+    test.df[[paste0("imp_",i)]] <- imp
+  }
+  return(test.df)
+}
+
 #impute missing data
-df.test.imp <- impute_test(impute.fits, df.test, c('team.revenue', 'city.pop', 'city.work.force', 'city.employed', 'city.unemployed', 'city.returns',
-                                                   'city.exempt', 'city.agi', 'city.salary', 'team.ticket', 'team.fci'))
+df.test.imp <- impute_test_local(impute.fits, df.test, impute_vars)
 
 #create derived features
 df.test.imp$city.unemploy.rate <- df.test.imp$imp_city.unemployed / df.test.imp$imp_city.work.force
-df.test.imp$team.avg.attend <- df.test.imp$team.total.attend / df.test.imp$team.total.gms
-df.test.imp$team.salary.per.win <- df.test.imp$team.salary / df.test.imp$team.wins
-df.test.imp$team.revenue.multiple <- df.test.imp$team.value / df.test.imp$imp_team.revenue
-df.test.imp$team.salary.per.attend <- df.test.imp$team.salary / df.test.imp$team.total.attend
+df.test.imp$team.avg.attend <- df.test.imp$imp_team.total.attend / df.test.imp$team.total.gms
+df.test.imp$team.salary.per.win <- df.test.imp$imp_team.salary / df.test.imp$imp_team.wins
+df.test.imp$team.revenue.multiple <- df.test.imp$imp_team.value / df.test.imp$imp_team.revenue
+df.test.imp$team.salary.per.attend <- df.test.imp$imp_team.salary / df.test.imp$imp_team.total.attend
 df.test.imp$team.attend.revenue <- df.test.imp$team.total.attend * df.test.imp$imp_team.ticket
 #df.test.imp$city.salary.per.capita <- df.test.imp$imp_city.salary / df.test.imp$imp_city.returns
 
@@ -205,17 +219,16 @@ metric <- 'RMSE'
 
 #universal unneeded variables for modeling
 droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple')
-orig_var <- c('team.revenue', 'city.pop', 'city.work.force', 'city.employed', 'city.unemployed', 'city.returns', 'city.exempt', 'city.agi',
-              'city.salary', 'team.champs.5yr', 'team.revenue.multiple', 'team.value', 'imp_city.returns', 'team.ticket', 'team.fci')
-other_drop_vars <- c('team.attend.revenue', 'team.superstar', 'team.superstar.cat')
+orig_var <- c(impute_vars, 'imp_team.champs.5yr')
+other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 
 
 #Linear Regression
 #
 #drop unneeded features
-drop.sub1 <- c('year', 'sp.return', 'real.gdp.delta', 'team.total.attend', 'imp_city.salary', 'imp_city.agi', 'imp_city.employed',
+drop.sub1 <- c('year', 'imp_sp.return', 'imp_real.gdp.delta', 'imp_team.total.attend', 'imp_city.salary', 'imp_city.agi', 'imp_city.employed',
                'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed', 'imp_team.fci',
-               'trans_city.exempt', 'trans_city.returns')
+               'imp_city.returns', 'imp_team.superstar')
 
 subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub1))
 subset1 %>%
@@ -286,9 +299,9 @@ names(subset3)
 var_floor <- sqrt(ncol(subset3)-1) %>% floor()
 grid <- expand.grid(.mtry=1:20)
 rf_cv <- train(imp_team.revenue~., data=subset3, method='rf', metric=metric, trControl=fitCtrl, tuneGrid=grid, importance=TRUE)
-rf_cv_pred <- rf_cv$finalModel$predicted
+rf_cv_final <- rf_cv$finalModel
 
-rf <- randomForest(imp_team.revenue~., data=subset3, ntree=2000, mtry=6, importance=TRUE)
+rf <- randomForest(imp_team.revenue~., data=subset3, ntree=1000, mtry=10, importance=TRUE)
 varImp(rf_cv)
 varImpPlot(rf, main="Variable Importance Plot")
 
@@ -298,7 +311,7 @@ MAE(df.test.imp$imp_team.revenue, rf.pred)
 RMSE(df.test.imp$imp_team.revenue, rf.pred)
 
 #OOS (rf_cv) error estimation
-#rf_cv_pred <- predict(rf_cv$finalModel, newdata=df.test.imp)
+rf_cv_pred <- predict(rf_cv_final, newdata=df.test.imp)
 
 
 #XGBoost
