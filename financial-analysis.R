@@ -21,13 +21,14 @@ require(psych)
 require(forecast)
 require(grid)
 require(caret)
+require(xgboost)
 require(ggplot2)
 require(gridExtra)
 require(reshape2)
 require(plyr)
 require(dplyr)
 source('https://raw.githubusercontent.com/jchristo12/general/master/r_udf.R')
-#source('C:/Users/Joe/general-code/r-udf.R')
+#source('C:/Users/Joe/general-code/r_udf.R')
 
 #======= Data Load and Cleanup======
 #change the working directory
@@ -315,7 +316,27 @@ rf_cv_pred <- predict(rf_cv_final, newdata=df.test.imp)
 
 
 #XGBoost
+subset4 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars))
+#perform one hot encoding
+#subset4 <- one_hot_encode(subset4)
+#remove year from the dataframe
+subset4 <- subset(subset4, select=-year)
 
+#built training matrices
+train_x <- model.matrix(imp_team.revenue~., data=subset4)[, -1]
+train_y <- subset4$imp_team.revenue
+dtrain <- xgb.DMatrix(data=train_x, label=train_y)
+
+#set the tuning grid
+tune_xgb <- expand.grid(nrounds=c(100,200,500), lambda=c(0.01, 0.1), alpha=1, eta=c(0.05))
+#tune the xgboost algorithm
+set.seed(675)
+xgb.1 <- train(imp_team.revenue~., data=subset4, method='xgbLinear', trControl=fitCtrl, tuneGrid=tune_xgb, metric=metric)
+
+#OOS error estimation
+xgb.1.pred <- predict(xgb.1, newdata=df.test.imp)
+MAE(df.test.imp$imp_team.revenue, xgb.1.pred)
+RMSE(df.test.imp$imp_team.revenue, xgb.1.pred)
 
 
 
