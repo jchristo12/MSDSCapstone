@@ -66,7 +66,7 @@ df$team.ticket <- ifelse(df$team.ticket == 0, NA, df$team.ticket)
 
 #read in player stats dataframe
 player <- read.csv(paste0(github, 'player-stats.csv'))
-player <- player[,c('Year', 'Player', 'Tm', 'WS')]
+player <- player.orig[,c('Year', 'Player', 'Tm', 'WS')]
 player$team.year <- as.factor(paste0(player$Tm, "-", player$Year))
 player <- player[!is.na(player$Year) & player$Year >= 2004 & player$Tm != '',]
 player <- player[, c(2,4:5)]
@@ -93,7 +93,8 @@ stats_df_combo <- function(path, na_string, orig_df){
   new_df$salary.per.pt <- new_df$team.salary / new_df$PTS
   return(new_df)
 }
-#df <- stats_df_combo(paste0(data_path, 'team-stats.csv), nas, df)  don't want to include this dataframe
+df <- stats_df_combo(paste0(github, 'team-stats.csv'), nas, df)
+
 
 #get all the financial variables in the same units
 df$city.agi <- df$city.agi/1000000
