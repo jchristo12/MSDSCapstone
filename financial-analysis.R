@@ -95,6 +95,19 @@ stats_df_combo <- function(path, na_string, orig_df){
 }
 #df <- stats_df_combo(paste0(data_path, 'team-stats.csv), nas, df)  don't want to include this dataframe
 
+#get all the financial variables in the same units
+df$city.agi <- df$city.agi/1000000
+df$city.salary <- df$city.salary/1000000
+df$team.salary <- df$team.salary/1000000
+#put the other large numbers in terms of '000s
+df$city.pop <- df$city.pop/1000
+df$team.total.attend <- df$team.total.attend/1000
+df$city.exempt <- df$city.exempt/1000
+df$city.employed <- df$city.employed/1000
+df$city.work.force <- df$city.work.force/1000
+df$city.unemployed <- df$city.unemployed/1000
+df$city.returns <- df$city.returns/1000
+
 
 #create the data partition
 set.seed(6)
