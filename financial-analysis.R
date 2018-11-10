@@ -66,7 +66,7 @@ df$team.ticket <- ifelse(df$team.ticket == 0, NA, df$team.ticket)
 
 #read in player stats dataframe
 player <- read.csv(paste0(github, 'player-stats.csv'))
-player <- player.orig[,c('Year', 'Player', 'Tm', 'WS')]
+player <- player[,c('Year', 'Player', 'Tm', 'WS')]
 player$team.year <- as.factor(paste0(player$Tm, "-", player$Year))
 player <- player[!is.na(player$Year) & player$Year >= 2004 & player$Tm != '',]
 player <- player[, c(2,4:5)]
@@ -125,6 +125,7 @@ missing_values(df.train)
 ggplot(df.train) +
   geom_histogram(aes(team.revenue), bins=30) +
   labs(title='Annual Franchise Revenue', x='Revenue ($m)', y='Count')
+
 df.train[df.train$team.revenue > 250,]
 #   transformed target variable
 ggplot(df.train) +
@@ -142,6 +143,16 @@ ggplot(df.train) +
 ggplot(df.train) +
   geom_boxplot(aes(x=team.champs.5yr, y=team.revenue))
 
+
+#correlation heatmap of team revenue and team stats
+df.train[,c(8,32:54,17)] %>%
+  cor_heatmap()
+
+#team revenue and 3pt attempted
+ggplot(df.train) +
+  geom_point(aes(x=X3PA, y=team.revenue))
+
+df.train <- df.train[,-c(30:35, 37:51, 53)]
 
 
 #impute variables using decision trees
@@ -189,7 +200,7 @@ p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
 
 #create a correlation headmap
 df.train.imp %>%
-  select_if(is.numeric) %>%
+  select_if(is.numeric) %>% names()
   select(-c(impute_vars, year, team.total.gms)) %>%
   cor_heatmap()
 
@@ -229,14 +240,14 @@ other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 #drop unneeded features
 drop.sub1 <- c('year', 'imp_sp.return', 'imp_real.gdp.delta', 'imp_team.total.attend', 'imp_city.salary', 'imp_city.agi', 'imp_city.employed',
                'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed', 'imp_team.fci',
-               'imp_city.returns', 'imp_team.superstar')
+               'imp_city.returns', 'imp_team.superstar', 'imp_PTS')
 
 subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub1))
 subset1 %>%
   select_if(is.numeric) %>%
   cor_heatmap()
 #build the model
-lin.mod.1 <- lm(log(imp_team.revenue)~., data=subset1)
+lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_team.salary-city.unemploy.rate, data=subset1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
