@@ -236,7 +236,7 @@ df.test.imp$team.salary.per.attend <- df.test.imp$imp_team.salary / df.test.imp$
 #df.test.imp$city.salary.per.capita <- df.test.imp$imp_city.salary / df.test.imp$imp_city.returns
 
 #transform variables
-df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$team.champs.5yr != '0',  'Y', 'N') %>% factor()
+df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$imp_team.champs.5yr != '0',  'Y', 'N') %>% factor()
 #df.test.imp$trans_city.returns <- log(df.test.imp$imp_city.returns)
 #df.test.imp$trans_city.exempt <- log(df.test.imp$imp_city.exempt)
 
@@ -248,18 +248,9 @@ fitCtrl <- trainControl(method="repeatedcv", number=10, repeats=3)
 rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
 metric <- 'RMSE'
 
-
-#recursive feature elimination
-rfe_results <- df.train.imp %>%
-  select(-c(city, team, nickname, city.year, team.year, nickname.year, year, team.total.gms, imp_team.fci,
-            imp_team.value, team.revenue.multiple, imp_team.revenue, team.attend.revenue, imp_team.total.attend)) %>%
-  rfe(y=df.train.imp$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control, metric='RMSE')
-#list the top predictors
-predictors(rfe_results)
-
 #universal unneeded variables for modeling
 droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple')
-orig_var <- c(impute_vars, 'imp_team.champs.5yr')
+orig_var <- c('imp_team.champs.5yr')
 other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 
 
@@ -270,10 +261,20 @@ drop.sub1 <- c('year', 'imp_sp.return', 'imp_real.gdp.delta', 'imp_team.total.at
                'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed', 'imp_team.fci',
                'imp_city.returns', 'imp_team.superstar', 'imp_PTS')
 
+
 subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub1))
 subset1 %>%
   select_if(is.numeric) %>%
   cor_heatmap()
+
+#recursive feature elimination
+rfe_results <- df.train.imp %>%
+  rfe(y=subset1$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control, metric=metric)
+#list the top predictors
+predictors(rfe_results)
+
+
+
 #build the model
 lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_team.salary-city.unemploy.rate, data=subset1)
 
