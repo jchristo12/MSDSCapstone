@@ -157,6 +157,12 @@ ggplot(df.train) +
 df.train[,c(8,32:54,17)] %>%
   cor_heatmap()
 
+#correlation heatmap of stat rankings and team.revenue
+df.train[,c(8,57:83)] %>%
+  cor_heatmap()
+
+
+
 #team revenue and 3pt attempted
 ggplot(df.train) +
   geom_point(aes(x=X3PA, y=team.revenue))
