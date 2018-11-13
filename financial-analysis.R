@@ -102,7 +102,7 @@ ranking_df_combo <- function(path, na_string, orig_df){
   new_df <- left_join(orig_df, rankings, by='team.year')
   return(new_df)
 }
-df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
+#df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
 
 
 #get all the financial variables in the same units
@@ -158,14 +158,12 @@ df.train[,c(8,32:54,17)] %>%
   cor_heatmap()
 
 #correlation heatmap of stat rankings and team.revenue
-df.train[,c(8,57:83)] %>%
-  cor_heatmap()
-
+#df.train[,c(8,57:83)] %>% cor_heatmap()
 
 
 #team revenue and 3pt attempted
 ggplot(df.train) +
-  geom_point(aes(x=X3PA, y=team.revenue))
+  geom_point(aes(x=X3PA, y=team.revenue, color=Age.rank))
 
 df.train <- df.train[,-c(30:35, 37:51, 53)]
 
