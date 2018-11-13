@@ -172,7 +172,7 @@ df.train[,high_cor] %>% names()
 ggplot(df.train) +
   geom_point(aes(x=X3PA, y=team.revenue, color=Age.rank))
 
-df.train <- df.train[,-c(30:35, 37:51, 53)]
+#df.train <- df.train[,-c(30:35, 37:51, 53)]
 
 
 #impute variables using decision trees
@@ -205,6 +205,13 @@ df.train.imp$trans_team.champs.5yr <- ifelse(df.train.imp$imp_team.champs.5yr !=
 #df.train.imp$trans_city.returns <- log(df.train.imp$imp_city.returns)
 #df.train.imp$trans_city.exempt <- log(df.train.imp$imp_city.exempt)
 df.train.imp$team.superstar.cat <- as.factor(df.train.imp$imp_team.superstar)
+
+#recursive feature elimination
+rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
+rfe_results <- df.train.imp %>%
+  select(-imp_team.revenue) %>%
+  rfe(y=df.train.imp$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control)
+
 
 
 #analyze the categorical superstar on team value or revenue
