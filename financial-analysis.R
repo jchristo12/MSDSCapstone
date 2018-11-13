@@ -249,21 +249,15 @@ rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
 metric <- 'RMSE'
 
 #universal unneeded variables for modeling
-droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple')
+droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple', 'year')
 orig_var <- c('imp_team.champs.5yr')
 other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
+high_cor_vars <- c('imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
+                   'imp_city.work.force')
 
-holding_vars <- c('imp_sp.return', 'imp_real.gdp.delta', 'imp_city.employed',
-                  'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed',
-                  'imp_city.returns', 'imp_team.superstar', 'imp_PTS')
 #Linear Regression
-#
 #drop unneeded features
-drop.sub1 <- c('year', 'imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
-               'imp_city.work.force')
-               
-
-subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub1))
+subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars))
 subset1 %>%
   select_if(is.numeric) %>%
   cor_heatmap()
@@ -364,8 +358,7 @@ rf_cv_pred <- predict(rf_cv_final, newdata=df.test.imp)
 subset4 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars))
 #perform one hot encoding
 #subset4 <- one_hot_encode(subset4)
-#remove year from the dataframe
-subset4 <- subset(subset4, select=-year)
+
 
 #built training matrices
 train_x <- model.matrix(imp_team.revenue~., data=subset4)[, -1]
