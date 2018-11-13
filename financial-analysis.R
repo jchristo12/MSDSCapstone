@@ -102,7 +102,7 @@ ranking_df_combo <- function(path, na_string, orig_df){
   new_df <- left_join(orig_df, rankings, by='team.year')
   return(new_df)
 }
-#df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
+df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
 
 
 #get all the financial variables in the same units
@@ -163,6 +163,7 @@ df.train[,c(8,32:54,17)] %>%
 #find highly correlated features
 high_cor <- df.train %>%
   select_if(is.numeric) %>%
+  select(-team.revenue) %>%
   cor(method='pearson', use='pair') %>%
   findCorrelation(cutoff=0.75)
 df.train[,high_cor] %>% names()
@@ -197,7 +198,7 @@ df.train.imp$team.avg.attend <- df.train.imp$imp_team.total.attend / df.train.im
 df.train.imp$team.salary.per.win <- df.train.imp$imp_team.salary / df.train.imp$imp_team.wins
 df.train.imp$team.revenue.multiple <- df.train.imp$imp_team.value / df.train.imp$imp_team.revenue
 df.train.imp$team.salary.per.attend <- df.train.imp$imp_team.salary / df.train.imp$imp_team.total.attend
-df.train.imp$team.attend.revenue <- df.train.imp$imp_team.total.attend * df.train.imp$imp_team.ticket
+#df.train.imp$team.attend.revenue <- df.train.imp$imp_team.total.attend * df.train.imp$imp_team.ticket
 #df.train.imp$city.salary.per.capita <- df.train.imp$imp_city.salary / df.train.imp$imp_city.returns
 
 #transform variables
@@ -205,13 +206,6 @@ df.train.imp$trans_team.champs.5yr <- ifelse(df.train.imp$imp_team.champs.5yr !=
 #df.train.imp$trans_city.returns <- log(df.train.imp$imp_city.returns)
 #df.train.imp$trans_city.exempt <- log(df.train.imp$imp_city.exempt)
 df.train.imp$team.superstar.cat <- as.factor(df.train.imp$imp_team.superstar)
-
-#recursive feature elimination
-rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
-rfe_results <- df.train.imp %>%
-  select(-imp_team.revenue) %>%
-  rfe(y=df.train.imp$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control)
-
 
 
 #analyze the categorical superstar on team value or revenue
@@ -227,15 +221,10 @@ p2 + geom_point(aes(x=team.salary.per.win, y=imp_team.revenue, color=city.franch
 p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
 
 
-#create a correlation headmap
-df.train.imp %>%
-  select_if(is.numeric) %>% names()
-  select(-c(impute_vars, year, team.total.gms)) %>%
-  cor_heatmap()
-
 #====== Process the Test Data ======
 #impute missing data
-df.test.imp <- impute_test(impute.fits, df.test, impute_vars)
+df.test.imp <- impute_test(impute.fits, df.test, impute_vars) %>%
+  select(-impute_vars)
 
 #create derived features
 df.test.imp$city.unemploy.rate <- df.test.imp$imp_city.unemployed / df.test.imp$imp_city.work.force
@@ -243,20 +232,30 @@ df.test.imp$team.avg.attend <- df.test.imp$imp_team.total.attend / df.test.imp$t
 df.test.imp$team.salary.per.win <- df.test.imp$imp_team.salary / df.test.imp$imp_team.wins
 df.test.imp$team.revenue.multiple <- df.test.imp$imp_team.value / df.test.imp$imp_team.revenue
 df.test.imp$team.salary.per.attend <- df.test.imp$imp_team.salary / df.test.imp$imp_team.total.attend
-df.test.imp$team.attend.revenue <- df.test.imp$team.total.attend * df.test.imp$imp_team.ticket
+#df.test.imp$team.attend.revenue <- df.test.imp$team.total.attend * df.test.imp$imp_team.ticket
 #df.test.imp$city.salary.per.capita <- df.test.imp$imp_city.salary / df.test.imp$imp_city.returns
 
 #transform variables
 df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$team.champs.5yr != '0',  'Y', 'N') %>% factor()
-df.test.imp$trans_city.returns <- log(df.test.imp$imp_city.returns)
-df.test.imp$trans_city.exempt <- log(df.test.imp$imp_city.exempt)
+#df.test.imp$trans_city.returns <- log(df.test.imp$imp_city.returns)
+#df.test.imp$trans_city.exempt <- log(df.test.imp$imp_city.exempt)
 
 
 
 #====== Data Modeling ======
 #set the training parameters
 fitCtrl <- trainControl(method="repeatedcv", number=10, repeats=3)
+rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
 metric <- 'RMSE'
+
+
+#recursive feature elimination
+rfe_results <- df.train.imp %>%
+  select(-c(city, team, nickname, city.year, team.year, nickname.year, year, team.total.gms, imp_team.fci,
+            imp_team.value, team.revenue.multiple, imp_team.revenue, team.attend.revenue, imp_team.total.attend)) %>%
+  rfe(y=df.train.imp$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control, metric='RMSE')
+#list the top predictors
+predictors(rfe_results)
 
 #universal unneeded variables for modeling
 droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple')
