@@ -95,6 +95,15 @@ stats_df_combo <- function(path, na_string, orig_df){
 }
 df <- stats_df_combo(paste0(github, 'team-stats.csv'), nas, df)
 
+#read in team stat rankings
+ranking_df_combo <- function(path, na_string, orig_df){
+  rankings <- read.csv(path, na.strings=nas)
+  #join the data frames
+  new_df <- left_join(orig_df, rankings, by='team.year')
+  return(new_df)
+}
+df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
+
 
 #get all the financial variables in the same units
 df$city.agi <- df$city.agi/1000000
