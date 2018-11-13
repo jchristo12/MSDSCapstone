@@ -160,6 +160,13 @@ df.train[,c(8,32:54,17)] %>%
 #correlation heatmap of stat rankings and team.revenue
 #df.train[,c(8,57:83)] %>% cor_heatmap()
 
+#find highly correlated features
+high_cor <- df.train %>%
+  select_if(is.numeric) %>%
+  cor(method='pearson', use='pair') %>%
+  findCorrelation(cutoff=0.75)
+df.train[,high_cor] %>% names()
+
 
 #team revenue and 3pt attempted
 ggplot(df.train) +
@@ -177,7 +184,9 @@ df.train.imp <- impute_trees(df.train.impute, impute_vars)
 impute.fits <- store_impute_fit(df.train.impute, impute_vars)
 #rm(df.train.impute)
 #combine the imputed variables to the main training dataframe
-df.train.imp <- cbind(df.train[,c(1:3,5:7)], df.train.imp) %>% data.frame()
+df.train.imp <- cbind(df.train[,c(1:3,5:7)], df.train.imp) %>%
+  data.frame() %>%
+  select(-c(impute_vars))
 
 missing_values(df.train.imp)
 
