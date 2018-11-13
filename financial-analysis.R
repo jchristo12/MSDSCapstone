@@ -253,14 +253,15 @@ droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.ye
 orig_var <- c('imp_team.champs.5yr')
 other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 
-
+holding_vars <- c('imp_sp.return', 'imp_real.gdp.delta', 'imp_city.employed',
+                  'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed',
+                  'imp_city.returns', 'imp_team.superstar', 'imp_PTS')
 #Linear Regression
 #
 #drop unneeded features
-drop.sub1 <- c('year', 'imp_sp.return', 'imp_real.gdp.delta', 'imp_team.total.attend', 'imp_city.salary', 'imp_city.agi', 'imp_city.employed',
-               'imp_city.work.force', 'imp_city.pop', 'team.salary.per.win', 'team.salary.per.attend', 'imp_city.unemployed', 'imp_team.fci',
-               'imp_city.returns', 'imp_team.superstar', 'imp_PTS')
-
+drop.sub1 <- c('year', 'imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
+               'imp_city.work.force')
+               
 
 subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub1))
 subset1 %>%
@@ -268,15 +269,19 @@ subset1 %>%
   cor_heatmap()
 
 #recursive feature elimination
-rfe_results <- df.train.imp %>%
-  rfe(y=subset1$imp_team.revenue, sizes=c(1:20), rfeControl=rfe_control, metric=metric)
+rfe_results <- subset1 %>%
+  select(-imp_team.revenue) %>%
+  rfe(y=log(subset1$imp_team.revenue), sizes=c(1:25), rfeControl=rfe_control, metric=metric)
 #list the top predictors
 predictors(rfe_results)
 
+#build the linear regression model
+model_data1 <- subset1 %>%
+  select(predictors(rfe_results)) %>%
+  cbind('imp_team.revenue'=subset1$imp_team.revenue) %>%
+  data.frame()
 
-
-#build the model
-lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_team.salary-city.unemploy.rate, data=subset1)
+lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_team.salary-imp_X3P, data=model_data1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
