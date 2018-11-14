@@ -103,6 +103,7 @@ ranking_df_combo <- function(path, na_string, orig_df){
   return(new_df)
 }
 df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
+rank_var_names <- names(df[,55:82])
 
 
 #get all the financial variables in the same units
@@ -284,7 +285,7 @@ metric <- 'RMSE'
 
 #universal unneeded variables for modeling
 droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple', 'year',
-              stats_var_names, tax_var_names)
+              rank_var_names, stats_var_names, tax_var_names)
 orig_var <- c('imp_team.champs.5yr')
 other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 high_cor_vars <- c('imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
@@ -310,7 +311,7 @@ model_data1 <- subset1 %>%
   cbind('imp_team.revenue'=subset1$imp_team.revenue) %>%
   data.frame()
 
-lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_team.salary-imp_X3P, data=model_data1)
+lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_real.gdp.delta-imp_team.salary-tax.pc2, data=model_data1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
@@ -374,7 +375,6 @@ names(subset3)
 var_floor <- sqrt(ncol(subset3)-1) %>% floor()
 grid <- expand.grid(.mtry=1:20)
 rf_cv <- train(imp_team.revenue~., data=subset3, method='rf', metric=metric, trControl=fitCtrl, tuneGrid=grid, importance=TRUE)
-rf_cv_final <- rf_cv$finalModel
 
 rf <- randomForest(imp_team.revenue~., data=subset3, ntree=1000, mtry=10, importance=TRUE)
 varImp(rf_cv)
@@ -386,7 +386,9 @@ MAE(df.test.imp$imp_team.revenue, rf.pred)
 RMSE(df.test.imp$imp_team.revenue, rf.pred)
 
 #OOS (rf_cv) error estimation
-rf_cv_pred <- predict(rf_cv_final, newdata=df.test.imp)
+rf_cv_pred <- predict(rf_cv, newdata=df.test.imp)
+MAE(df.test.imp$imp_team.revenue, rf_cv_pred)
+RMSE(df.test.imp$imp_team.revenue, rf_cv_pred)
 
 
 #XGBoost
