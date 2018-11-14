@@ -183,7 +183,7 @@ impute_vars <- names(df.train.impute)[-c(1, 9)]
 df.train.imp <- impute_trees(df.train.impute, impute_vars)
 #store the training fits to use on the test data
 impute.fits <- store_impute_fit(df.train.impute, impute_vars)
-#rm(df.train.impute)
+rm(df.train.impute)
 #combine the imputed variables to the main training dataframe
 df.train.imp <- cbind(df.train[,c(1:3,5:7)], df.train.imp) %>%
   data.frame() %>%
@@ -219,6 +219,23 @@ p2 <- ggplot(df.train.imp)
 
 p2 + geom_point(aes(x=team.salary.per.win, y=imp_team.revenue, color=city.franchises))
 p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
+
+
+#PCA for various data points
+#stats
+stats_var_names <- names(df.train.imp[,c(32:52)])
+stats_df <- df.train.imp[,c(32:52)]
+fa.parallel(stats_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
+stats_pca <- principal(stats_df, nfactors=5, rotate='varimax', scores=TRUE)
+stats_pca_df <- stats_pca$scores %>% data.frame()
+
+#tax data
+tax_var_names <- names(df.train.imp[,c(22:25)])
+tax_df <- df.train.imp[,c(22:25)]
+fa.parallel(tax_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
+tax_pca <- principal(tax_df, nfactors=2, rotate='varimax', scores=TRUE)
+tax_pca_df <- tax_pca$scores %>% data.frame()
+
 
 
 #====== Process the Test Data ======
