@@ -270,7 +270,7 @@ df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$imp_team.champs.5yr != '
 stats_test <- predict(stats_pca_pre, newdata=df.test.imp)[,69:73]
 colnames(stats_test) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
 #tax data
-tax_test <- predict(tax_pca_pre, newdata=df.test.imp)[,71:73]
+tax_test <- predict(tax_pca_pre, newdata=df.test.imp)[,86:87]
 colnames(tax_test) <- c('tax.pc1', 'tax.pc2')
 #combine data
 df.test.imp <- cbind(df.test.imp, stats_test, tax_test) %>% data.frame()
@@ -283,7 +283,8 @@ rfe_control <- rfeControl(functions=rfFuncs, method='cv', number=10)
 metric <- 'RMSE'
 
 #universal unneeded variables for modeling
-droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple', 'year')
+droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple', 'year',
+              stats_var_names, tax_var_names)
 orig_var <- c('imp_team.champs.5yr')
 other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
 high_cor_vars <- c('imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
