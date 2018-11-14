@@ -225,17 +225,25 @@ p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
 #stats
 stats_var_names <- names(df.train.imp[,c(32:52)])
 stats_df <- df.train.imp[,c(32:52)]
-fa.parallel(stats_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
-stats_pca <- principal(stats_df, nfactors=5, rotate='varimax', scores=TRUE)
-stats_pca_df <- stats_pca$scores %>% data.frame()
+#fa.parallel(stats_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
+stats_pca_pre <- preProcess(stats_df, method=c('center', 'scale', 'pca'), pcaComp=5)
+stats_pca_df <- predict(stats_pca_pre, stats_df)
+#stats_pca <- principal(stats_df, nfactors=5, rotate='varimax', scores=TRUE)
+#stats_pca_df <- stats_pca$scores %>% data.frame()
+colnames(stats_pca_df) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
 
 #tax data
 tax_var_names <- names(df.train.imp[,c(22:25)])
 tax_df <- df.train.imp[,c(22:25)]
-fa.parallel(tax_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
-tax_pca <- principal(tax_df, nfactors=2, rotate='varimax', scores=TRUE)
-tax_pca_df <- tax_pca$scores %>% data.frame()
+#fa.parallel(tax_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
+tax_pca_pre <- preProcess(tax_df, method=c('center', 'scale', 'pca'), pcaComp=2)
+tax_pca_df <- predict(tax_pca_pre, tax_df)
+#tax_pca <- principal(tax_df, nfactors=2, rotate='varimax', scores=TRUE)
+#tax_pca_df <- tax_pca$scores %>% data.frame()
+colnames(tax_pca_df) <- c('tax.pc1', 'tax.pc2')
 
+#add PCA columns to training data frame
+df.train.imp <- cbind(df.train.imp, stats_pca_df, tax_pca_df) %>% data.frame()
 
 
 #====== Process the Test Data ======
@@ -257,6 +265,15 @@ df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$imp_team.champs.5yr != '
 #df.test.imp$trans_city.returns <- log(df.test.imp$imp_city.returns)
 #df.test.imp$trans_city.exempt <- log(df.test.imp$imp_city.exempt)
 
+#add PCA data
+#stats data
+stats_test <- predict(stats_pca_pre, newdata=df.test.imp)[,69:73]
+colnames(stats_test) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
+#tax data
+tax_test <- predict(tax_pca_pre, newdata=df.test.imp)[,71:73]
+colnames(tax_test) <- c('tax.pc1', 'tax.pc2')
+#combine data
+df.test.imp <- cbind(df.test.imp, stats_test, tax_test) %>% data.frame()
 
 
 #====== Data Modeling ======
