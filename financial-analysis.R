@@ -189,7 +189,7 @@ rm(df.train.impute)
 df.train.imp <- cbind(df.train[,c(1:3,5:7)], df.train.imp) %>%
   data.frame() %>%
   select(-c(impute_vars))
-
+rank_var_names <- paste0('imp_', rank_var_names)
 missing_values(df.train.imp)
 
 
@@ -287,13 +287,13 @@ metric <- 'RMSE'
 droplist <- c('city', 'team', 'nickname', 'city.year', 'team.year', 'nickname.year', 'imp_team.value', 'team.total.gms', 'team.revenue.multiple', 'year',
               rank_var_names, stats_var_names, tax_var_names)
 orig_var <- c('imp_team.champs.5yr')
-other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat')
+other_drop_vars <- c('team.attend.revenue', 'team.superstar.cat', 'imp_G', 'imp_PTS.rank', 'imp_MP')
 high_cor_vars <- c('imp_team.fci', 'imp_city.salary', 'imp_city.agi', 'imp_city.exempt', 'imp_team.total.attend', 'imp_city.pop', 'imp_city.employed',
-                   'imp_city.work.force')
+                   'imp_city.work.force', 'team.salary.per.win', 'team.salary.per.attend', 'imp_team.superstar')
 
 #Linear Regression
 #drop unneeded features
-subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars))
+subset1 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars, 'imp_pts.per.gm', 'imp_salary.per.pt'))
 subset1 %>%
   select_if(is.numeric) %>%
   cor_heatmap()
@@ -301,7 +301,7 @@ subset1 %>%
 #recursive feature elimination
 rfe_results <- subset1 %>%
   select(-imp_team.revenue) %>%
-  rfe(y=log(subset1$imp_team.revenue), sizes=c(1:25), rfeControl=rfe_control, metric=metric)
+  rfe(y=log(subset1$imp_team.revenue), sizes=c(1:dim(subset1)[2]), rfeControl=rfe_control, metric=metric)
 #list the top predictors
 predictors(rfe_results)
 
@@ -310,8 +310,10 @@ model_data1 <- subset1 %>%
   select(predictors(rfe_results)) %>%
   cbind('imp_team.revenue'=subset1$imp_team.revenue) %>%
   data.frame()
+model_data1$tax.pc1 <- subset1$tax.pc1
 
-lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_real.gdp.delta-imp_team.salary-tax.pc2, data=model_data1)
+lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_real.gdp.delta-imp_city.unemployed-tax.pc2-city.unemploy.rate-imp_city.franchises-
+                  imp_team.ticket-stats.pc1, data=model_data1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
@@ -332,6 +334,9 @@ lin.mod.1.pred <- predict(lin.mod.1, newdata=df.test.imp, interval='predict') %>
   cbind('act'=df.test.imp$imp_team.revenue)
 MAE(df.test.imp$imp_team.revenue, lin.mod.1.pred[,1])
 RMSE(df.test.imp$imp_team.revenue, lin.mod.1.pred[,1])
+
+#features used in model
+features <- names(lin.mod.1$coefficients)[-1]
 
 
 #LASSO regression
@@ -369,7 +374,7 @@ RMSE(y.test.lasso, lasso.1.pred)
 
 
 #Random Forest
-drop.sub3 <- c('year', 'imp_team.fci', 'imp_city.salary', 'trans_city.exempt', 'trans_city.returns', 'team.total.attend')
+drop.sub3 <- c('year', 'imp_team.fci', 'imp_city.salary', 'trans_city.exempt', 'trans_city.returns', 'imp_team.total.attend')
 subset3 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub3))
 names(subset3)
 var_floor <- sqrt(ncol(subset3)-1) %>% floor()
@@ -469,3 +474,109 @@ comp_team(66)
 team1 <- df.nn.y[seq(1,419),1] %>% data.frame()
 team2 <- df.nn.y[nn_output[seq(1,419)],1] %>% data.frame()
 nn.result <- cbind('team1'=team1, 'team2'=team2)
+
+
+
+#====== Final Franchise Revenue Model ======
+#impute variables using decision trees
+df_final_impute <- df %>%
+  select(-c(1:3,5:7))
+impute_vars_final <- names(df_final_impute)[-c(1, 9)]
+df_final_imp <- impute_trees(df_final_impute, impute_vars_final)
+rm(df_final_impute)
+#combine the imputed variables to the main training dataframe
+df_final_imp <- cbind(df[,c(1:3,5:7)], df_final_imp) %>%
+  data.frame() %>%
+  select(-c(impute_vars))
+
+#create derived variables
+df_final_imp$team.avg.attend <- df_final_imp$imp_team.total.attend / df_final_imp$team.total.gms
+
+#create PCA variables
+#PCA for various data points
+#stats
+stats_final_df <- df_final_imp[,c(32:52)]
+stats_pca_obj <- preProcess(stats_final_df, method=c('center', 'scale', 'pca'), pcaComp=5)
+stats_pca_final_df <- predict(stats_pca_obj, stats_final_df)
+colnames(stats_pca_final_df) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
+#tax data
+tax_final_df <- df_final_imp[,c(22:25)]
+tax_pca_obj <- preProcess(tax_final_df, method=c('center', 'scale', 'pca'), pcaComp=2)
+tax_pca_final_df <- predict(tax_pca_obj, tax_final_df)
+colnames(tax_pca_final_df) <- c('tax.pc1', 'tax.pc2')
+#add PCA columns to final data frame
+df_final_imp <- cbind(df_final_imp, stats_pca_final_df, tax_pca_final_df) %>% data.frame()
+
+#Calculate final model parameters
+final_model_df <- subset(df_final_imp, select=features)
+final_model_df$imp_team.revenue <- df_final_imp$imp_team.revenue
+
+final_model <- lm(log(imp_team.revenue)~., data=final_model_df)
+
+#create function to ingest seattle data and prep to run through model
+rev_func <- function(seattle_data){
+  #prep the tax data
+  tax <- seattle_data[,3:6]
+  tax_df <- predict(tax_pca_obj, tax)
+  colnames(tax_df) <- c('tax.pc1', 'tax.pc2')
+  #prep the stats data
+  stats <- seattle_data[,15:35]
+  stats_df <- predict(stats_pca_obj, stats)
+  colnames(stats_df) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
+  #add pca variables to data for modeling
+  model_data <- cbind(seattle_data, tax_df, stats_df) %>% data.frame()
+  #make the predictions
+  output <- predict(final_model, newdata=model_data, interval='predict')
+  return(output)
+}
+
+
+#====== Final Valuation Model ======
+drop_final_nn <- c(1:10,13:14,16,30:31,53:91)
+final_nn_df <- df_final_imp[,-drop_final_nn]
+final_nn_df <- cbind(final_nn_df, 'team.avg.attend'=df_final_imp$team.avg.attend) %>% data.frame()
+final_nn_df$city.umemploy.rate <- final_nn_df$imp_city.unemployed / final_nn_df$imp_city.work.force
+final_nn_df$trans_team.champs.5yr <- ifelse(final_nn_df$imp_team.champs.5yr != '0',  'Y', 'N') %>% factor()
+final_nn_df <- create_subset(final_nn_df, c('imp_team.champs.5yr', 'imp_city.work.force', 'imp_city.employed', 'imp_city.unemployed', 'imp_team.ticket',
+                                            'imp_team.fci'))
+#one hot encoding
+te <- dummy(final_nn_df$trans_team.champs.5yr)
+final_nn_df <- cbind(final_nn_df, te) %>% data.frame()
+rm(te)
+final_nn_df <- subset(final_nn_df, select=-c(trans_team.champs.5yr))
+
+#create the revenue, value, and multiple data frame
+df_final_imp$rev.multiple <- df_final_imp$imp_team.value / df_final_imp$imp_team.revenue
+nn_key <- subset(df_final_imp, select=c(team.year, rev.multiple, imp_team.revenue, imp_team.value))
+
+#reformat dataframe columns
+final_nn_df <- cbind(final_nn_df[,-c(2,4,10:31)], final_nn_df[,c(2,4,10:31)]) %>% data.frame()
+
+value_func <- function(seattle_data){
+  others <- dim(final_nn_df)[1]
+  sea_length <- dim(seattle_data)[1]
+  #add seattle data to data frame
+  all_df <- rbind(final_nn_df, seattle_data) %>% data.frame()
+  #scale the data
+  nn_scaled <- scale(all_df, center=TRUE, scale=TRUE)
+  #create the final KNN model
+  final_nn_output <- knn.index(nn_scaled, k=1, algorithm='kd_tree')
+  comp_team <- final_nn_output[c((others+1):(others+sea_length)),1]
+  #find the revenue multiple for the seattle teams
+  #initialize a data frame
+  full_return <- matrix(ncol=4, nrow=0) %>%
+    data.frame() %>%
+    setNames(c('compTeam', 'compMultiple', 'compRevenue', 'compValue'))
+  #loop through all of the comparison teams and add the details to the data frame
+  for(comp in comp_team){
+    result <- nn_key[comp,]
+    full_return <- rbind(full_return, result) %>% data.frame()
+  }
+  return(full_return)
+}
+
+
+#====== Testing ======
+seattle_data <- read.csv('C:/Users/Joe/Desktop/seattle_data.csv')
+rev_func(seattle_data)
+value_func(seattle_data)
