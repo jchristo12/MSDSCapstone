@@ -299,6 +299,7 @@ subset1 %>%
   cor_heatmap()
 
 #recursive feature elimination
+set.seed(45)
 rfe_results <- subset1 %>%
   select(-imp_team.revenue) %>%
   rfe(y=log(subset1$imp_team.revenue), sizes=c(1:dim(subset1)[2]), rfeControl=rfe_control, metric=metric)
@@ -310,10 +311,10 @@ model_data1 <- subset1 %>%
   select(predictors(rfe_results)) %>%
   cbind('imp_team.revenue'=subset1$imp_team.revenue) %>%
   data.frame()
-model_data1$tax.pc1 <- subset1$tax.pc1
+#model_data1$tax.pc1 <- subset1$tax.pc1
 
 lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_real.gdp.delta-imp_city.unemployed-tax.pc2-city.unemploy.rate-imp_city.franchises-
-                  imp_team.ticket-stats.pc1, data=model_data1)
+                  imp_team.ticket, data=model_data1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
@@ -577,6 +578,16 @@ value_func <- function(seattle_data){
 
 
 #====== Testing ======
-seattle_data <- read.csv('C:/Users/Joe/Desktop/seattle_data.csv')
+load_seattle_data <- function(){
+  df <- read.csv('https://raw.githubusercontent.com/jchristo12/MSDSCapstone/master/seattle_data.csv')
+  return(df)
+}
+seattle_data <- load_seattle_data()
 rev_func(seattle_data)
 value_func(seattle_data)
+
+#objects to keep in workspace
+keep <- c('rev_func', 'value_func', 'load_seattle_data', 'final_model', 'tax_pca_obj', 'stats_pca_obj', 'final_nn_df', 'nn_key')
+
+#REMOVES ALL OBJECTS EXCEPT WHAT IS SPECIFIED ABOVE
+rm(list=ls()[!(ls() %in% keep)])
