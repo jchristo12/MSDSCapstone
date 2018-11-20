@@ -34,6 +34,14 @@ source('https://raw.githubusercontent.com/jchristo12/general/master/r_udf.R')
 #change the working directory
 setwd("C:/Users/Joe/OneDrive - Northwestern University - Student Advantage/498 - Capstone Project")
 
+#Create helper functions
+pca_var_create <- function(df, pca_obj, col_names){
+  new_df <- predict(pca_obj, df)
+  colnames(new_df) <- col_names
+  return(new_df)
+}
+
+
 #set the strings that will be read as 'NA'
 nas = c("", '#NA', "NA", "N.A.", "#N/A")
 #path for the data
@@ -340,6 +348,19 @@ RMSE(df.test.imp$imp_team.revenue, lin.mod.1.pred[,1])
 features <- names(lin.mod.1$coefficients)[-1]
 
 
+
+#====== TESTING ======
+#seattle_data <- load_seattle_data()
+#tax_sea <- pca_var_create(seattle_data[,3:6], tax_pca_pre, c('tax.pc1', 'tax.pc2'))
+#stats_sea <- pca_var_create(seattle_data[,15:35], stats_pca_pre, c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5'))
+#seattle_data_full <- cbind(seattle_data, tax_sea, stats_sea) %>% data.frame()
+
+#test_model <- lm(log(imp_team.revenue)~., data=subset(model_data1, select=c('imp_team.revenue', features)))
+#summary(test_model)
+#predict(test_model, newdata=seattle_data_full) %>% exp()
+
+
+
 #LASSO regression
 drop_lasso <- c('year', 'imp_city.agi', 'imp_city.exempt')
 
@@ -527,7 +548,7 @@ rev_func <- function(seattle_data){
   #add pca variables to data for modeling
   model_data <- cbind(seattle_data, tax_df, stats_df) %>% data.frame()
   #make the predictions
-  output <- predict(final_model, newdata=model_data, interval='predict')
+  output <- predict(final_model, newdata=model_data, interval='predict') %>% exp()
   return(output)
 }
 
@@ -550,28 +571,30 @@ final_nn_df <- subset(final_nn_df, select=-c(trans_team.champs.5yr))
 df_final_imp$rev.multiple <- df_final_imp$imp_team.value / df_final_imp$imp_team.revenue
 nn_key <- subset(df_final_imp, select=c(team.year, rev.multiple, imp_team.revenue, imp_team.value))
 
-#reformat dataframe columns
+#reorder dataframe columns
 final_nn_df <- cbind(final_nn_df[,-c(2,4,10:31)], final_nn_df[,c(2,4,10:31)]) %>% data.frame()
 
 value_func <- function(seattle_data){
   others <- dim(final_nn_df)[1]
+  start <- others + 1
   sea_length <- dim(seattle_data)[1]
-  #add seattle data to data frame
-  all_df <- rbind(final_nn_df, seattle_data) %>% data.frame()
-  #scale the data
-  nn_scaled <- scale(all_df, center=TRUE, scale=TRUE)
-  #create the final KNN model
-  final_nn_output <- knn.index(nn_scaled, k=1, algorithm='kd_tree')
-  comp_team <- final_nn_output[c((others+1):(others+sea_length)),1]
-  #find the revenue multiple for the seattle teams
   #initialize a data frame
   full_return <- matrix(ncol=4, nrow=0) %>%
     data.frame() %>%
     setNames(c('compTeam', 'compMultiple', 'compRevenue', 'compValue'))
-  #loop through all of the comparison teams and add the details to the data frame
-  for(comp in comp_team){
-    result <- nn_key[comp,]
+  #add seasons one by one to get their match
+  i <- 1
+  while(i <= sea_length){
+    all_df <- rbind(final_nn_df, seattle_data[i,]) %>% data.frame()
+    #scale the data
+    nn_scaled <- scale(all_df, center=TRUE, scale=TRUE)
+    #create the final KNN model
+    final_nn_output <- knn.index(nn_scaled, k=1, algorithm='kd_tree')
+    comp_team <- final_nn_output[start,1]
+    #find the revenue multiple for the seattle teams
+    result <- nn_key[comp_team,]
     full_return <- rbind(full_return, result) %>% data.frame()
+    i <- i + 1
   }
   return(full_return)
 }
