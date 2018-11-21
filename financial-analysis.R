@@ -264,6 +264,9 @@ df.train.imp <- cbind(df.train.imp, stats_pca_df, tax_pca_df) %>% data.frame()
 df.test.imp <- impute_test(impute.fits, df.test, impute_vars) %>%
   select(-impute_vars)
 
+#relabel levels in league tv deal variable
+df.test.imp$imp_league.tv.deal <- revalue(df.test.imp$imp_league.tv.deal, c('1'='765', '2'='930', '3'='2600'))
+
 #create derived features
 df.test.imp$city.unemploy.rate <- df.test.imp$imp_city.unemployed / df.test.imp$imp_city.work.force
 df.test.imp$team.avg.attend <- df.test.imp$imp_team.total.attend / df.test.imp$team.total.gms
@@ -354,7 +357,7 @@ features <- names(lin.mod.1$coefficients)[-1]
 
 
 
-#====== TESTING ======
+# TESTING
 #seattle_data <- load_seattle_data()
 #tax_sea <- pca_var_create(seattle_data[,3:6], tax_pca_pre, c('tax.pc1', 'tax.pc2'))
 #stats_sea <- pca_var_create(seattle_data[,15:35], stats_pca_pre, c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5'))
@@ -369,7 +372,13 @@ features <- names(lin.mod.1$coefficients)[-1]
 #LASSO regression
 drop_lasso <- c('year', 'imp_city.agi', 'imp_city.exempt')
 
-subset2 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop_lasso))
+subset2 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars, drop_lasso))
+subset2 <- dummy(subset2$trans_team.champs.5yr)[,2] %>%
+  cbind(subset2) %>%
+  data.frame() %>%
+  select(-trans_team.champs.5yr)
+colnames(subset2)[1] <- 'trans_team.champs.5yrY'
+
 x.lasso <- model.matrix(imp_team.revenue~., data=subset2)[,-1]
 y.lasso <- subset2$imp_team.revenue
 #find the best lambda
@@ -392,7 +401,13 @@ cbind('actual'=y.lasso, 'fit'=c(lasso.fit)) %>%
   labs(title='Actual vs. Fit', subtitle='Training Data', x='Actual', y='Fitted')
 
 #estimate OOS error
-subtest2 <- create_subset(df.test.imp, c(droplist, orig_var, other_drop_vars, drop_lasso))
+subtest2 <- subset(df.test.imp, select=names(subset2)[-1])
+#create dummy variable so matrix can be created
+subtest2 <- dummy(df.test.imp$trans_team.champs.5yr) %>%
+  cbind(subtest2) %>%
+  data.frame()
+colnames(subtest2)[1] <- 'trans_team.champs.5yrY'
+
 x.test.lasso <- model.matrix(imp_team.revenue~., subtest2)[,-1]
 y.test.lasso <- subtest2$imp_team.revenue
 lasso.1.pred <- predict(lasso.1, s=bestLambda, newx=x.test.lasso)
@@ -402,7 +417,7 @@ RMSE(y.test.lasso, lasso.1.pred)
 
 #Random Forest
 drop.sub3 <- c('year', 'imp_team.fci', 'imp_city.salary', 'trans_city.exempt', 'trans_city.returns', 'imp_team.total.attend')
-subset3 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, drop.sub3))
+subset3 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars, drop.sub3))
 names(subset3)
 var_floor <- sqrt(ncol(subset3)-1) %>% floor()
 grid <- expand.grid(.mtry=1:20)
@@ -424,15 +439,15 @@ RMSE(df.test.imp$imp_team.revenue, rf_cv_pred)
 
 
 #XGBoost
-subset4 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars))
+subset4 <- create_subset(df.train.imp, c(droplist, orig_var, other_drop_vars, high_cor_vars))
 #perform one hot encoding
 #subset4 <- one_hot_encode(subset4)
 
 
 #built training matrices
-train_x <- model.matrix(imp_team.revenue~., data=subset4)[, -1]
-train_y <- subset4$imp_team.revenue
-dtrain <- xgb.DMatrix(data=train_x, label=train_y)
+#train_x <- model.matrix(imp_team.revenue~., data=subset4)[, -1]
+#train_y <- subset4$imp_team.revenue
+#dtrain <- xgb.DMatrix(data=train_x, label=train_y)
 
 #set the tuning grid
 tune_xgb <- expand.grid(nrounds=c(100,200,500), lambda=c(0.01, 0.1), alpha=1, eta=c(0.05))
