@@ -58,7 +58,7 @@ df <- df[,-c(27:28)]
 
 #convert the columns into the correct data types
 df$team.champs.5yr <- as.factor(df$team.champs.5yr)
-#df$city.franchises <- as.factor(df$city.franchises)
+df$league.tv.deal <- as.factor(df$league.tv.deal)
 
 
 #find features that have 0s that shouldn't
@@ -111,7 +111,7 @@ ranking_df_combo <- function(path, na_string, orig_df){
   return(new_df)
 }
 df <- ranking_df_combo(paste0(github, 'team-stat-ranking.csv'), nas, df)
-rank_var_names <- names(df[,55:82])
+rank_var_names <- names(df[,57:85])
 
 
 #get all the financial variables in the same units
@@ -152,18 +152,22 @@ ggplot(df.train) +
 ggplot(df.train) +
   geom_point(aes(x=team.fci, y=team.revenue, color=team.champs.5yr))
 
+ggplot(df.train) +
+  geom_boxplot(aes(x=league.tv.deal, y=team.value))
+
 
 #team value
 ggplot(df.train) +
   geom_histogram(aes(team.value), bins=30)
+
 
 #number of championships in last 5yrs
 ggplot(df.train) +
   geom_boxplot(aes(x=team.champs.5yr, y=team.revenue))
 
 
-#correlation heatmap of team revenue and team stats
-df.train[,c(8,32:54,17)] %>%
+#correlation heatmap of team revenue, value, and team stats
+df.train[,c(8,9,34:56,17)] %>%
   cor_heatmap()
 
 #correlation heatmap of stat rankings and team.revenue
@@ -232,8 +236,8 @@ p2 + geom_point(aes(x=team.attend.revenue, y=imp_team.revenue))
 
 #PCA for various data points
 #stats
-stats_var_names <- names(df.train.imp[,c(32:52)])
-stats_df <- df.train.imp[,c(32:52)]
+stats_var_names <- names(df.train.imp[,c(34:54)])
+stats_df <- df.train.imp[,c(34:54)]
 #fa.parallel(stats_df, fa='pc', main='Screeplot w/ Parallel Analysis', n.iter=100, show.legend=TRUE)
 stats_pca_pre <- preProcess(stats_df, method=c('center', 'scale', 'pca'), pcaComp=5)
 stats_pca_df <- predict(stats_pca_pre, stats_df)
@@ -276,10 +280,10 @@ df.test.imp$trans_team.champs.5yr <- ifelse(df.test.imp$imp_team.champs.5yr != '
 
 #add PCA data
 #stats data
-stats_test <- predict(stats_pca_pre, newdata=df.test.imp)[,69:73]
+stats_test <- predict(stats_pca_pre, newdata=df.test.imp)[,71:75]
 colnames(stats_test) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
 #tax data
-tax_test <- predict(tax_pca_pre, newdata=df.test.imp)[,86:87]
+tax_test <- predict(tax_pca_pre, newdata=df.test.imp)[,88:89]
 colnames(tax_test) <- c('tax.pc1', 'tax.pc2')
 #combine data
 df.test.imp <- cbind(df.test.imp, stats_test, tax_test) %>% data.frame()
@@ -319,10 +323,11 @@ model_data1 <- subset1 %>%
   select(predictors(rfe_results)) %>%
   cbind('imp_team.revenue'=subset1$imp_team.revenue) %>%
   data.frame()
-#model_data1$tax.pc1 <- subset1$tax.pc1
+#model_data1$imp_league.tv.deal <- subset1$imp_league.tv.deal
+model_data1$stats.pc1 <- subset1$stats.pc1
+#model_data1$stats.pc3 <- subset1$stats.pc3
 
-lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_real.gdp.delta-imp_city.unemployed-tax.pc2-city.unemploy.rate-imp_city.franchises-
-                  imp_team.ticket, data=model_data1)
+lin.mod.1 <- lm(log(imp_team.revenue)~.-imp_city.unemployed-imp_team.ticket-tax.pc2-imp_city.franchises, data=model_data1)
 
 summary(lin.mod.1)
 par(mfrow=c(2,2))
@@ -517,7 +522,7 @@ df_final_imp$team.avg.attend <- df_final_imp$imp_team.total.attend / df_final_im
 #create PCA variables
 #PCA for various data points
 #stats
-stats_final_df <- df_final_imp[,c(32:52)]
+stats_final_df <- df_final_imp[,c(34:54)]
 stats_pca_obj <- preProcess(stats_final_df, method=c('center', 'scale', 'pca'), pcaComp=5)
 stats_pca_final_df <- predict(stats_pca_obj, stats_final_df)
 colnames(stats_pca_final_df) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
@@ -542,7 +547,7 @@ rev_func <- function(seattle_data){
   tax_df <- predict(tax_pca_obj, tax)
   colnames(tax_df) <- c('tax.pc1', 'tax.pc2')
   #prep the stats data
-  stats <- seattle_data[,15:35]
+  stats <- seattle_data[,19:39]
   stats_df <- predict(stats_pca_obj, stats)
   colnames(stats_df) <- c('stats.pc1', 'stats.pc2', 'stats.pc3', 'stats.pc4', 'stats.pc5')
   #add pca variables to data for modeling
@@ -554,8 +559,9 @@ rev_func <- function(seattle_data){
 
 
 #====== Final Valuation Model ======
-drop_final_nn <- c(1:10,13:14,16,30:31,53:91)
-final_nn_df <- df_final_imp[,-drop_final_nn]
+drop_final_nn <- c(1:10,13:14,16,32:33,55:93)
+stats_nn <- c(34:54)
+final_nn_df <- df_final_imp[,-c(drop_final_nn, stats_nn)]
 final_nn_df <- cbind(final_nn_df, 'team.avg.attend'=df_final_imp$team.avg.attend) %>% data.frame()
 final_nn_df$city.umemploy.rate <- final_nn_df$imp_city.unemployed / final_nn_df$imp_city.work.force
 final_nn_df$trans_team.champs.5yr <- ifelse(final_nn_df$imp_team.champs.5yr != '0',  'Y', 'N') %>% factor()
@@ -567,35 +573,50 @@ final_nn_df <- cbind(final_nn_df, te) %>% data.frame()
 rm(te)
 final_nn_df <- subset(final_nn_df, select=-c(trans_team.champs.5yr))
 
+te <- dummy(final_nn_df$imp_league.tv.deal)
+final_nn_df <- cbind(final_nn_df, te) %>% data.frame()
+rm(te)
+final_nn_df <- subset(final_nn_df, select=-c(imp_league.tv.deal))
+
 #create the revenue, value, and multiple data frame
 df_final_imp$rev.multiple <- df_final_imp$imp_team.value / df_final_imp$imp_team.revenue
 nn_key <- subset(df_final_imp, select=c(team.year, rev.multiple, imp_team.revenue, imp_team.value))
 
 #reorder dataframe columns
-final_nn_df <- cbind(final_nn_df[,-c(2,4,10:31)], final_nn_df[,c(2,4,10:31)]) %>% data.frame()
+#final_nn_df <- cbind(final_nn_df[,-c(2,4,11:32)], final_nn_df[,c(2,4,11:32)]) %>% data.frame()
+final_nn_df <- cbind(final_nn_df[,-c(2,4,11)], final_nn_df[,c(2,4,11)]) %>% data.frame()
 
 value_func <- function(seattle_data){
+  seattle_data <- seattle_data[,-c(19:39)]
   others <- dim(final_nn_df)[1]
   start <- others + 1
   sea_length <- dim(seattle_data)[1]
   #initialize a data frame
-  full_return <- matrix(ncol=4, nrow=0) %>%
-    data.frame() %>%
-    setNames(c('compTeam', 'compMultiple', 'compRevenue', 'compValue'))
+  full_mult <- matrix(ncol=1, nrow=0) %>%
+    data.frame()
+  full_comp <- matrix(ncol=1, nrow=0) %>%
+    data.frame()
   #add seasons one by one to get their match
   i <- 1
+  k <- 3
   while(i <= sea_length){
     all_df <- rbind(final_nn_df, seattle_data[i,]) %>% data.frame()
     #scale the data
     nn_scaled <- scale(all_df, center=TRUE, scale=TRUE)
     #create the final KNN model
-    final_nn_output <- knn.index(nn_scaled, k=1, algorithm='kd_tree')
-    comp_team <- final_nn_output[start,1]
+    final_nn_output <- knn.index(nn_scaled, k=k, algorithm='kd_tree')
+    comp_team <- final_nn_output[start,c(1:k)]
     #find the revenue multiple for the seattle teams
     result <- nn_key[comp_team,]
-    full_return <- rbind(full_return, result) %>% data.frame()
+    mean_mult <- mean(result[,2])
+    top_comp <- nn_key[comp_team,1][1]
+    output <- c(top_comp, mean_mult)
+    full_mult <- rbind(full_mult, mean_mult) %>% data.frame()
+    full_comp <- rbind(full_comp, top_comp) %>% data.frame()
     i <- i + 1
   }
+  full_return <- cbind(full_comp, full_mult) %>% data.frame()
+  colnames(full_return) <- c('compTeam', 'avgMultiple')
   return(full_return)
 }
 
