@@ -423,14 +423,14 @@ var_floor <- sqrt(ncol(subset3)-1) %>% floor()
 grid <- expand.grid(.mtry=1:20)
 rf_cv <- train(imp_team.revenue~., data=subset3, method='rf', metric=metric, trControl=fitCtrl, tuneGrid=grid, importance=TRUE)
 
-rf <- randomForest(imp_team.revenue~., data=subset3, ntree=1000, mtry=10, importance=TRUE)
+#rf <- randomForest(imp_team.revenue~., data=subset3, ntree=1000, mtry=10, importance=TRUE)
 varImp(rf_cv)
-varImpPlot(rf, main="Variable Importance Plot")
+#varImpPlot(rf, main="Variable Importance Plot")
 
 #OOS (rf) error estimation
-rf.pred <- predict(rf, newdata=df.test.imp)
-MAE(df.test.imp$imp_team.revenue, rf.pred)
-RMSE(df.test.imp$imp_team.revenue, rf.pred)
+#rf.pred <- predict(rf, newdata=df.test.imp)
+#MAE(df.test.imp$imp_team.revenue, rf.pred)
+#RMSE(df.test.imp$imp_team.revenue, rf.pred)
 
 #OOS (rf_cv) error estimation
 rf_cv_pred <- predict(rf_cv, newdata=df.test.imp)
