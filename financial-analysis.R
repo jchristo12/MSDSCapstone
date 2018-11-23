@@ -425,6 +425,7 @@ rf_cv <- train(imp_team.revenue~., data=subset3, method='rf', metric=metric, trC
 
 #rf <- randomForest(imp_team.revenue~., data=subset3, ntree=1000, mtry=10, importance=TRUE)
 varImp(rf_cv)
+plot(varImp(rf_cv), main='Variable Importance Plot')
 #varImpPlot(rf, main="Variable Importance Plot")
 
 #OOS (rf) error estimation
